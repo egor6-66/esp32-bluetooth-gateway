@@ -6,8 +6,8 @@
 #include "config.h"
 
 void initEventBus() {
-    BUS_SERIAL.begin(BUS_BAUD_RATE);
-    DEBUG_PRINTLN("🚌 Event bus initialized (Serial1 @ 9600)");
+    BUS_SERIAL.begin(BUS_BAUD_RATE, SERIAL_8N1, 16, 17); // ✅ 115200 будет применена
+    DEBUG_PRINTLN("🚌 Event bus initialized (Serial2 @ 115200, GPIO16/17)");
 }
 
 void sendResponse(const char* requestId, const char* status, const char* message, JsonDocument& additional) {

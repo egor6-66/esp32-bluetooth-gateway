@@ -18,8 +18,8 @@
 #define LOOP_DELAY_MS             100
 
 // ———— Шина (Serial для примера) ————
-#define BUS_SERIAL                Serial1   // или Serial, или SoftwareSerial
-#define BUS_BAUD_RATE             9600
+#define BUS_SERIAL                Serial2   // или Serial, или SoftwareSerial
+#define BUS_BAUD_RATE             115200
 
 // ———— Отладка ————
 #define DEBUG_ENABLED             true
