@@ -34,24 +34,20 @@ void sendResponse(const char* requestId, const char* status, const char* message
 }
 
 void routeEventToBus(const char* requestId, const char* moduleName, const char* eventName, JsonObject& payload) {
-    // 📦 Формируем сообщение для шины
     StaticJsonDocument<JSON_BUFFER_SIZE> busMessage;
     busMessage["source"] = "BLE_GATEWAY";
     busMessage["moduleName"] = moduleName;
     busMessage["eventName"] = eventName;
     busMessage["payload"] = payload;
-
-    // 🧷 Добавляем requestId для возможного ответа
     busMessage["requestId"] = requestId;
 
     String serialized;
     serializeJson(busMessage, serialized);
 
-    // 🚌 Отправляем на шину (в данном случае — Serial1)
-    BUS_SERIAL.println(serialized);
-    DEBUG_PRINT("🚌 Routed to bus: ");
-    DEBUG_PRINTLN(serialized);
+    BUS_SERIAL.println(serialized); // ✅ Только это уходит на шину
 
-    // ✅ Отправляем подтверждение по BLE
+    // Логируй в отладку, если нужно
+    // DEBUG_PRINT("✅ Routed: "); DEBUG_PRINTLN(serialized);
+
     sendResponse(requestId, "success", "Event routed to bus");
 }
