@@ -1,19 +1,28 @@
-// main.cpp
-
 #include <Arduino.h>
-#include "config.h"
-#include "ble_handler.h"
-#include "event_router.h"
+#include "./config.h"
+#include "./eventBus/eventBus.h"
+#include "./handler/handler.h"
+#define IS_GATEWAY
 
 void setup() {
     Serial.begin(SERIAL_BAUD_RATE);
     DEBUG_PRINTLN("🚀 Starting ESP32 BLE Gateway...");
 
-    initEventBus();   // Инициализация шины
-    initBLE();        // Инициализация BLE сервера
+    EventBus::begin();
+    initBLE();
 }
 
 void loop() {
-    handleIncomingBLEMessage();  // Проверка и обработка входящих BLE сообщений
+    // Обработка входящих BLE сообщений
+    handleIncomingBLEMessage();
+
+    // Обработка ответов от модулей
+    if (EventBus::available()) {
+        String line = EventBus::readLine();
+        if (line.length() > 0) {
+            handleModuleResponse(line);
+        }
+    }
+
     delay(LOOP_DELAY_MS);
 }

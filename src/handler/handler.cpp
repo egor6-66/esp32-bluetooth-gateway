@@ -1,9 +1,8 @@
-// ble_handler.cpp
-
-#include "ble_handler.h"
-#include "event_router.h"
+#include <Arduino.h>
 #include <ArduinoJson.h>
-#include "config.h"
+#include "./handler.h"
+#include "../eventBus/eventBus.h"
+#include "../config.h"
 
 BLECharacteristic* pCharacteristic = nullptr;
 bool deviceConnected = false;
@@ -59,36 +58,75 @@ void handleIncomingBLEMessage() {
     DEBUG_PRINT("📥 BLE Received: ");
     DEBUG_PRINTLN(value);
 
-    StaticJsonDocument<JSON_BUFFER_SIZE> doc;
+    DynamicJsonDocument doc(JSON_BUFFER_SIZE);
     DeserializationError error = deserializeJson(doc, value);
 
     if (error) {
         DEBUG_PRINT("❌ JSON parse error: ");
         DEBUG_PRINTLN(error.c_str());
-        pCharacteristic->setValue(""); // очищаем
+        pCharacteristic->setValue("");
         return;
     }
 
     const char* requestId = doc["id"];
-    if (!requestId) {
-        DEBUG_PRINTLN("⚠️ No 'id' field — ignoring message");
-        pCharacteristic->setValue("");
-        return;
-    }
-
-    const char* moduleName = doc["moduleName"] | "";
-    const char* eventName = doc["eventName"] | "";
+    const char* targetModule = doc["targetModule"];  // ⬅️ Кому адресовано
+    const char* eventName = doc["eventName"];
     JsonObject payload = doc["payload"];
 
-    if (strlen(moduleName) == 0 || strlen(eventName) == 0) {
-        DEBUG_PRINTLN("⚠️ Missing moduleName or eventName");
+    if (!requestId || !targetModule || !eventName) {
+        DEBUG_PRINTLN("⚠️ Missing required fields: id, targetModule, or eventName");
         pCharacteristic->setValue("");
         return;
     }
 
-    // 🚀 Передаем событие на шину
-    routeEventToBus(requestId, moduleName, eventName, payload);
+    // 🚀 Отправляем событие на шину
+    EventBus::sendEvent("BLE_GATEWAY", targetModule, eventName, payload, requestId);
 
     // 🧹 Очищаем характеристику
     pCharacteristic->setValue("");
+}
+
+void handleModuleResponse(const String& json) {
+    DynamicJsonDocument doc(JSON_BUFFER_SIZE);
+    DeserializationError error = deserializeJson(doc, json);
+
+    if (error) {
+        DEBUG_PRINT("❌ Failed to parse module response: ");
+        DEBUG_PRINTLN(error.c_str());
+        return;
+    }
+
+    const char* type = doc["type"];
+    if (strcmp(type, "response") != 0) return;
+
+    const char* requestId = doc["requestId"];
+    const char* status = doc["status"];
+    const char* message = doc["message"];
+
+    if (!requestId || !status || !message) {
+        DEBUG_PRINTLN("⚠️ Incomplete response from module");
+        return;
+    }
+
+    // Отправляем ответ обратно клиенту по BLE
+    if (deviceConnected && pCharacteristic) {
+        StaticJsonDocument<JSON_BUFFER_SIZE> response;
+        response["id"] = requestId;
+        response["status"] = status;
+        response["message"] = message;
+
+        JsonObject additional = doc["additional"];
+        if (additional) {
+            response["data"] = additional;
+        }
+
+        String jsonResponse;
+        serializeJson(response, jsonResponse);
+
+        pCharacteristic->setValue(jsonResponse.c_str());
+        pCharacteristic->notify();
+
+        DEBUG_PRINT("📲 Forwarded to BLE Client: ");
+        DEBUG_PRINTLN(jsonResponse);
+    }
 }
